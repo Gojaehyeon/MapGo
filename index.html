@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IMDF Builder - 지도 기반 IMDF 생성 도구</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            display: flex;
+            height: 100vh;
+        }
+        
+        #sidebar {
+            width: 350px;
+            background: #f5f5f5;
+            padding: 20px;
+            overflow-y: auto;
+            border-right: 1px solid #ddd;
+        }
+        
+        #map {
+            flex: 1;
+            height: 100vh;
+        }
+        
+        h1 {
+            font-size: 20px;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        
+        h2 {
+            font-size: 16px;
+            margin: 20px 0 10px 0;
+            color: #555;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 5px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #333;
+            font-size: 14px;
+        }
+        
+        input[type="text"],
+        input[type="number"],
+        select,
+        textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 5px;
+            margin-bottom: 5px;
+        }
+        
+        .btn:hover {
+            background: #0056b3;
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+        }
+        
+        .btn-danger:hover {
+            background: #c82333;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+        }
+        
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+        
+        .btn-success {
+            background: #28a745;
+        }
+        
+        .btn-success:hover {
+            background: #218838;
+        }
+        
+        .mode-indicator {
+            padding: 10px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+        
+        .mode-indicator.active {
+            background: #d4edda;
+            border-color: #28a745;
+        }
+        
+        .points-list {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+        }
+        
+        .point-item {
+            padding: 5px;
+            border-bottom: 1px solid #eee;
+            font-size: 12px;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .point-item:last-child {
+            border-bottom: none;
+        }
+        
+        .remove-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 2px 6px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 11px;
+        }
+    </style>
+</head>
+<body>
+    <div id="sidebar">
+        <h1>🗺️ IMDF Builder</h1>
+        
+        <div class="mode-indicator" id="modeIndicator">
+            <strong>모드:</strong> <span id="modeText">대기 중</span>
+        </div>
+        
+        <h2>📍 포인트 추가</h2>
+        <button class="btn" onclick="startAddingPoints()">포인트 추가 시작</button>
+        <button class="btn btn-secondary" onclick="finishPolygon()">폴리곤 완료</button>
+        <button class="btn btn-danger" onclick="clearPoints()">포인트 지우기</button>
+        
+        <div class="points-list" id="pointsList">
+            <div style="text-align: center; color: #999; padding: 20px;">
+                클릭한 포인트가 여기 표시됩니다
+            </div>
+        </div>
+        
+        <h2>🏢 Venue 정보</h2>
+        <div class="form-group">
+            <label>Venue 이름 (한국어)</label>
+            <input type="text" id="venueNameKo" placeholder="예: C5">
+        </div>
+        <div class="form-group">
+            <label>Venue 이름 (영어)</label>
+            <input type="text" id="venueNameEn" placeholder="예: C5">
+        </div>
+        <div class="form-group">
+            <label>Category</label>
+            <select id="venueCategory">
+                <option value="unspecified">Unspecified</option>
+                <option value="airport.intl">Airport International</option>
+                <option value="airport.regional">Airport Regional</option>
+                <option value="mall">Mall</option>
+                <option value="stadium">Stadium</option>
+                <option value="convention">Convention Center</option>
+                <option value="hotel">Hotel</option>
+                <option value="hospital">Hospital</option>
+            </select>
+        </div>
+        
+        <h2>🏗️ Building 정보</h2>
+        <div class="form-group">
+            <label>Building 이름 (한국어)</label>
+            <input type="text" id="buildingNameKo" placeholder="예: 포항공대 C5 연구동">
+        </div>
+        <div class="form-group">
+            <label>Building 이름 (영어)</label>
+            <input type="text" id="buildingNameEn" placeholder="예: POSTECH C5 Research Building">
+        </div>
+        
+        <h2>📍 Address 정보</h2>
+        <div class="form-group">
+            <label>주소</label>
+            <input type="text" id="addressStreet" placeholder="예: 77, Cheongam-ro">
+        </div>
+        <div class="form-group">
+            <label>도시</label>
+            <input type="text" id="addressCity" placeholder="예: Pohang-si">
+        </div>
+        <div class="form-group">
+            <label>지역코드</label>
+            <input type="text" id="addressProvince" placeholder="예: KR-47">
+        </div>
+        <div class="form-group">
+            <label>국가코드</label>
+            <input type="text" id="addressCountry" value="KR">
+        </div>
+        <div class="form-group">
+            <label>우편번호</label>
+            <input type="text" id="addressPostal" placeholder="예: 37673">
+        </div>
+        
+        <h2>💾 내보내기</h2>
+        <button class="btn btn-success" onclick="exportIMDF()">IMDF 번들 다운로드</button>
+    </div>
+    
+    <div id="map"></div>
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- JSZip for creating ZIP files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    
+    <script src="app.js"></script>
+</body>
+</html>
