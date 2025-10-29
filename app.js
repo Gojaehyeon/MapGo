@@ -1,10 +1,14 @@
 // 지도 초기화
-const map = L.map('map').setView([36.014352, 129.3257493], 18);
+const map = L.map('map', {
+    maxZoom: 22,
+    zoomControl: true
+}).setView([36.014352, 129.3257493], 18);
 
-// OpenStreetMap 타일 레이어 추가
+// OpenStreetMap 타일 레이어 추가 (더 높은 해상도 지원)
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap contributors',
-    maxZoom: 19
+    maxZoom: 22,
+    minZoom: 3
 }).addTo(map);
 
 // 상태 관리
@@ -43,9 +47,15 @@ function addPoint(e) {
     
     state.points.push(point);
     
-    // 마커 추가
+    // 마커 추가 (더 작고 정확한 마커)
     const marker = L.marker([point.lat, point.lng], {
-        draggable: true
+        draggable: true,
+        icon: L.divIcon({
+            className: 'custom-marker',
+            html: '<div style="background-color: #3388ff; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 0 2px #3388ff;"></div>',
+            iconSize: [12, 12],
+            iconAnchor: [6, 6]
+        })
     }).addTo(map);
     
     marker.on('dragend', function() {
@@ -114,7 +124,7 @@ function updatePointsList() {
     
     list.innerHTML = state.points.map((point, index) => `
         <div class="point-item">
-            <span>포인트 ${index + 1}: ${point.lat.toFixed(6)}, ${point.lng.toFixed(6)}</span>
+            <span>포인트 ${index + 1}: ${point.lat.toFixed(8)}, ${point.lng.toFixed(8)}</span>
             <button class="remove-btn" onclick="removePoint('${point.id}', state.markers[${index}])">삭제</button>
         </div>
     `).join('');
